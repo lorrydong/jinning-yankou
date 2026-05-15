@@ -263,6 +263,7 @@ body{
   </div>
   <div class="header-actions">
     <button class="btn btn-success btn-sm" onclick="saveMarkers()">💾 保存</button>
+    <button class="btn btn-info btn-sm" onclick="exportMarkers()">📤 导出</button>
     <button class="btn btn-info btn-sm" onclick="document.getElementById('importFile').click()">📂 导入</button>
     <input type="file" id="importFile" accept=".json" style="display:none" onchange="importMarkers(event)">
     <button class="btn btn-warning btn-sm" onclick="clearAllMarkers()">🗑️ 清空</button>
