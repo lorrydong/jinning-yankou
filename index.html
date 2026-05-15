@@ -164,6 +164,21 @@ body{
 }
 .audio-btn:hover{background:#d4a843;color:#0f0f1e}
 .audio-btn.playing{background:#d4a843;color:#0f0f1e}
+.seek-btn-30{
+  padding:6px 10px;border:1px solid #d4a843;border-radius:6px;
+  background:transparent;color:#d4a843;font-size:13px;cursor:pointer;
+  font-family:inherit;white-space:nowrap;flex-shrink:0;
+  transition:all .2s;
+}
+.seek-btn-30:hover{background:#d4a843;color:#0f0f1e}
+.seek-btn-10{
+  padding:6px 10px;border:1px solid #4a8ab5;border-radius:6px;
+  background:transparent;color:#4a8ab5;font-size:13px;cursor:pointer;
+  font-family:inherit;white-space:nowrap;flex-shrink:0;
+  transition:all .2s;
+}
+.seek-btn-10:hover{background:#4a8ab5;color:#fff}
+.seek-group{display:flex;gap:4px;flex-shrink:0}
 .audio-source-select{
   padding:4px 8px;background:#1a1a30;color:#e8d5b7;
   border:1px solid #3a3a5e;border-radius:4px;font-size:12px;
@@ -291,6 +306,10 @@ body{
     <div class="audio-section">
       <div class="audio-controls">
         <button class="audio-btn" id="playBtn" onclick="togglePlay()">▶</button>
+        <div class="seek-group">
+          <button class="seek-btn-30" onclick="seekRelative(-30)" title="快退30秒">◀◀ 30秒</button>
+          <button class="seek-btn-10" onclick="seekRelative(10)" title="快进10秒">10秒 ▶▶</button>
+        </div>
         <select class="audio-source-select" id="audioSource" onchange="switchAudio()">
           <option value="上">🔸 上半部</option>
           <option value="下">🔹 下半部</option>
@@ -348,7 +367,8 @@ body{
         <p style="margin-top:8px"><b>导出/导入：</b>用顶部按钮导出 JSON 备份，或导入之前导出的数据。</p>
         <p style="margin-top:8px"><b>快捷键：</b></p>
         <p>Space — 播放/暂停</p>
-        <p>← → — 快退/快进 5 秒</p>
+        <p>← → — 快退/快进 10 秒</p>
+        <p>◀◀ 30秒 / 10秒 ▶▶ — 点按快退30秒、快进10秒</p>
         <p>↑ ↓ — 上/下一页</p>
         <p style="margin-top:8px;color:#6a6a8a">💡 建议：一边播放录音，眼睛看着法本，听到哪段就点哪段的位置。</p>
       </div>
@@ -482,6 +502,11 @@ function togglePlay() {
   } else {
     audioPlayer.pause();
   }
+}
+
+function seekRelative(sec) {
+  if (!audioReady || !audioPlayer.duration) return;
+  audioPlayer.currentTime = Math.max(0, Math.min(audioPlayer.duration, audioPlayer.currentTime + sec));
 }
 
 function seekAudio(val) {
@@ -953,11 +978,11 @@ function onKeyDown(e) {
       break;
     case 'ArrowLeft':
       e.preventDefault();
-      audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 5);
+      audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 10);
       break;
     case 'ArrowRight':
       e.preventDefault();
-      audioPlayer.currentTime = Math.min(audioPlayer.duration || Infinity, audioPlayer.currentTime + 5);
+      audioPlayer.currentTime = Math.min(audioPlayer.duration || Infinity, audioPlayer.currentTime + 10);
       break;
     case 'ArrowUp':
       e.preventDefault();
