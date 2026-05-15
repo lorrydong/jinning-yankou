@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>晋宁焰口 · 标注工具</title>
+<style>
+* { margin:0; padding:0; box-sizing:border-box; }
+body {
+  font-family: "Noto Serif CJK SC", "SimSun", "Songti SC", serif;
+  background: #1a1a2e;
+  color: #e8d5b7;
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 16px;
+}
+.header { text-align:center; padding:20px 0; border-bottom:1px solid #3a3a5e; margin-bottom:16px; }
+.header h1 { font-size:22px; color:#f0d78a; }
+.header .subtitle { font-size:13px; color:#8a8aaa; margin-top:4px; }
+
+/* 工具栏 */
+.toolbar {
+  display: flex; gap: 8px; align-items: center; flex-wrap: wrap;
+  padding: 10px 12px; background: #222244; border-radius: 8px; margin-bottom: 16px;
+}
+.toolbar .btn {
+  padding: 8px 16px; border: none; border-radius: 6px;
+  font-size: 13px; cursor: pointer; font-family: inherit;
+}
+.btn-primary { background: #f0d78a; color: #1a1a2e; }
+.btn-primary:hover { background: #e0c770; }
+.btn-warning { background: #c0392b; color: white; }
+.btn-success { background: #27ae60; color: white; }
+.btn-info { background: #3498db; color: white; }
+.btn:disabled { opacity: 0.5; cursor: not-allowed; }
+
+.status-bar {
+  font-size: 12px; color: #8a8aaa; margin-left: auto;
+}
+.status-bar .highlight { color: #f0d78a; }
+
+/* 音频控制条 */
+.audio-section {
+  background: #0f0f1e; border-radius: 8px; padding: 12px; margin-bottom: 16px;
+}
+.audio-section audio { width: 100%; }
+.audio-time {
+  text-align: center; font-family: monospace; font-size: 14px;
+  color: #8a8aaa; margin-top: 6px;
+}
+
+/* 标注模式提示 */
+.mode-banner {
+  text-align: center; padding: 8px; border-radius: 6px; margin-bottom: 12px;
+  font-size: 14px; font-weight: bold;
+}
+.mode-idle { background: #2a2a44; color: #6a6a8a; }
+.mode-recording { background: #1e3a1e; color: #6aaa6a; animation: pulse 1.5s infinite; }
+@keyframes pulse { 0%{opacity:1} 50%{opacity:0.6} 100%{opacity:1} }
+
+/* 进度条 */
+.progress-bar {
+  height: 4px; background: #3a3a5e; border-radius: 2px; margin-bottom: 16px;
+  overflow: hidden;
+}
+.progress-bar .fill {
+  height: 100%; background: #f0d78a; border-radius: 2px; transition: width 0.3s;
+}
+
+/* 经文段落列表 */
+.doc-section {
+  margin-bottom: 6px; padding: 10px 14px;
+  background: #222244; border-radius: 6px;
+  border-left: 3px solid #4a4a7e;
+  cursor: pointer; transition: all 0.2s;
+  position: relative;
+}
+.doc-section:hover { background: #2a2a54; border-left-color: #f0d78a; }
+.doc-section .sec-title {
+  font-size: 12px; color: #8a8aaa; margin-bottom: 2px;
+}
+.doc-section .sec-text {
+  font-size: 15px; line-height: 1.7;
+}
+.doc-section .sec-badge {
+  font-size: 11px; padding: 2px 8px; border-radius: 10px;
+  margin-left: 8px; display: inline-block;
+}
+.badge-done { background: #1e3a1e; color: #6aaa6a; }
+.badge-current { background: #3a3a1e; color: #f0d78a; }
+.badge-pending { background: #2a2a3e; color: #5a5a7a; }
+
+.doc-section.annotated {
+  border-left-color: #27ae60; opacity: 0.85;
+}
+.doc-section.annotated .sec-text { color: #8a8a8a; }
+.doc-section.active {
+  border-left-color: #f0d78a; background: #2a3a2a;
+}
+.doc-section .sec-time {
+  font-size: 11px; color: #5a5a7a; margin-top: 4px;
+  font-family: monospace;
+}
+
+/* 快捷键提示 */
+.hotkeys {
+  font-size: 12px; color: #5a5a7a; text-align: center;
+  padding: 8px; border-top: 1px solid #3a3a5e; margin-top: 12px;
+}
+.hotkeys kbd {
+  background: #2a2a44; padding: 1px 6px; border-radius: 3px;
+  font-family: monospace; color: #8a8aaa; border: 1px solid #4a4a7e;
+}
+
+/* 模态框 */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7);
+  z-index: 200; justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #1a1a2e; border: 1px solid #3a3a5e; border-radius: 12px;
+  padding: 24px; max-width: 600px; width: 90%; max-height: 80vh; overflow-y: auto;
+}
+.modal h2 { color: #f0d78a; margin-bottom: 12px; }
+.modal textarea {
+  width: 100%; min-height: 200px; background: #0f0f1e;
+  color: #e8d5b7; border: 1px solid #3a3a5e; border-radius: 6px;
+  padding: 12px; font-family: monospace; font-size: 12px;
+}
+.modal .btn-row { display: flex; gap: 8px; margin-top: 12px; justify-content: flex-end; }
+
+/* 手机适配 */
+@media (max-width: 480px) {
+  body { padding: 8px; }
+  .doc-section { padding: 8px 10px; }
+  .doc-section .sec-text { font-size: 14px; }
+  .toolbar .btn { font-size: 12px; padding: 6px 10px; }
+}
+
+/* 滚动快速定位 */
+.scroll-nav {
+  position: fixed; right: 8px; top: 50%; transform: translateY(-50%);
+  display: flex; flex-direction: column; gap: 2px; z-index: 50;
+}
+.scroll-nav .dot {
+  width: 8px; height: 8px; border-radius: 50%; border: none;
+  cursor: pointer; padding: 0; background: #3a3a5e; transition: background 0.2s;
+}
+.scroll-nav .dot.annotated { background: #27ae60; }
+.scroll-nav .dot.current { background: #f0d78a; }
+.scroll-nav .dot:hover { transform: scale(1.5); }
+</style>
+</head>
+<body>
+
+<div class="header">
+  <h1>瑜伽焰口施食要集 · 标注工具</h1>
+  <div class="subtitle">晋宁焰口 · 2024年4月30日录 ｜ 听一段唱诵 → 点击对应的经文段落</div>
+</div>
+
+<!-- 模式横幅 -->
+<div id="modeBanner" class="mode-banner mode-idle">⏸ 待命 — 播放音频后点击【开始标注】</div>
+
+<!-- 工具栏 -->
+<div class="toolbar">
+  <button class="btn btn-primary" id="btnStart" disabled onclick="startAnnotation()">▶ 开 始 标 注</button>
+  <button class="btn btn-info" onclick="exportData()">💾 导出标注结果</button>
+  <button class="btn btn-success" onclick="document.getElementById('importInput').click()">📂 导入存档</button>
+  <input type="file" id="importInput" accept=".json" style="display:none" onchange="importData(event)">
+  <button class="btn btn-warning" onclick="resetAll()">⟳ 重置</button>
+  <span class="status-bar" id="statusBar">已标注: <span class="highlight" id="countDone">0</span> / <span id="countTotal">0</span></span>
+</div>
+
+<!-- 音频 -->
+<div class="audio-section">
+  <audio id="audioPlayer" controls>
+    <source src="晋宁焰口上.mp3" type="audio/mpeg">
+    <source src="晋宁焰口下.mp3" type="audio/mpeg">
+  </audio>
+  <div class="audio-time">当前：<span id="timeDisplay">00:00:00</span></div>
+</div>
+
+<!-- 进度 -->
+<div class="progress-bar"><div class="fill" id="progressFill" style="width:0%"></div></div>
+
+<!-- 经文列表 -->
+<div id="sectionList"></div>
+
+<!-- 底部快捷键 -->
+<div class="hotkeys">
+  <kbd>Space</kbd> 播放/暂停 ｜
+  <kbd>Enter</kbd> 标注当前选中段 ｜
+  <kbd>↑</kbd><kbd>↓</kbd> 切换段落 ｜
+  <kbd>←</kbd><kbd>→</kbd> 快退/快进5秒
+</div>
+
+<!-- 导出模态框 -->
+<div class="modal-overlay" id="exportModal">
+  <div class="modal">
+    <h2>📋 标注结果</h2>
+    <p style="color:#8a8aaa; margin-bottom:12px;">复制下方JSON数据发送给我，我来生成最终的点读页面。</p>
+    <textarea id="exportText" readonly></textarea>
+    <div class="btn-row">
+      <button class="btn btn-info" onclick="copyExport()">📋 复制</button>
+      <button class="btn btn-warning" onclick="closeModal('exportModal')">关闭</button>
+    </div>
+  </div>
+</div>
+
+<script>
+// ===== 经文数据 =====
+let SECTION_DATA = null;
+let annotated = {};  // sectionIndex -> { start, end }
+let totalSections = 0;
+let currentSection = -1;
+let isAnnotating = false;
+let lastClickTime = 0;
+
+// ===== 初始化 =====
+// 嵌入文档结构数据（由页面生成器填入）
+const EMBEDDED_DATA = `__EMBED_DATA__`;
+
+function init() {
+  try {
+    SECTION_DATA = JSON.parse(EMBEDDED_DATA);
+  } catch(e) {
+    SECTION_DATA = null;
+  }
+  
+  if (!SECTION_DATA || SECTION_DATA.length === 0) {
+    document.getElementById('sectionList').innerHTML = 
+      '<div style="text-align:center;padding:40px;color:#6a6a8a;">⚠️ 文档数据加载失败</div>';
+    return;
+  }
+  
+  totalSections = SECTION_DATA.length;
+  document.getElementById('countTotal').textContent = totalSections;
+  
+  // 加载本地存档
+  loadProgress();
+  renderSections();
+  updateStats();
+  
+  // 启用开始按钮（音频一播放就可用）
+  document.getElementById('btnStart').disabled = false;
+}
+
+// ===== 渲染经文 =====
+function renderSections() {
+  const container = document.getElementById('sectionList');
+  container.innerHTML = '';
+  
+  SECTION_DATA.forEach((sec, idx) => {
+    const div = document.createElement('div');
+    div.className = 'doc-section' + (annotated[idx] ? ' annotated' : '');
+    div.id = 'sec-' + idx;
+    div.dataset.index = idx;
+    
+    let html = '';
+    if (sec.title && sec.title !== '焰口施食要集')
+      html += `<div class="sec-title">${escapeHtml(sec.title)}</div>`;
+    html += `<div class="sec-text">${escapeHtml(sec.text)}</div>`;
+    
+    if (annotated[idx]) {
+      const t = annotated[idx];
+      html += `<div class="sec-time">⏱ ${fmt(t.start)} → ${fmt(t.end)}</div>`;
+    }
+    
+    div.innerHTML = html;
+    div.addEventListener('click', () => markSection(idx));
+    container.appendChild(div);
+  });
+  
+  // 快速导航点
+  renderNavDots();
+}
+
+function renderNavDots() {
+  const existing = document.querySelector('.scroll-nav');
+  if (existing) existing.remove();
+  
+  const nav = document.createElement('div');
+  nav.className = 'scroll-nav';
+  
+  for (let i = 0; i < SECTION_DATA.length; i++) {
+    const dot = document.createElement('button');
+    dot.className = 'dot' + (annotated[i] ? ' annotated' : '');
+    dot.title = `第${i+1}段: ${(SECTION_DATA[i].title || SECTION_DATA[i].text).slice(0, 20)}`;
+    dot.addEventListener('click', () => {
+      document.getElementById('sec-' + i)?.scrollIntoView({ behavior: 'smooth' });
+    });
+    nav.appendChild(dot);
+  }
+  document.body.appendChild(nav);
+}
+
+// ===== 标注逻辑 =====
+function startAnnotation() {
+  if (isAnnotating) return;
+  
+  const player = document.getElementById('audioPlayer');
+  if (player.paused && player.currentTime === 0) {
+    player.play();
+  }
+  
+  isAnnotating = true;
+  document.getElementById('btnStart').disabled = true;
+  document.getElementById('btnStart').textContent = '🔴 标注中...';
+  
+  // 找到第一个未标注的段落
+  for (let i = 0; i < totalSections; i++) {
+    if (!annotated[i]) {
+      highlightSection(i);
+      document.getElementById('sec-' + i)?.scrollIntoView({ behavior: 'smooth' });
+      break;
+    }
+  }
+  
+  updateModeBanner();
+}
+
+function markSection(idx) {
+  if (!isAnnotating) return;
+  
+  const player = document.getElementById('audioPlayer');
+  const currentTime = getGlobalTime(player);
+  
+  if (annotated[idx]) {
+    // 已标注的段落可以点击来跳转
+    playAtTime(annotated[idx].start);
+    return;
+  }
+  
+  // 计算当前段落的时间范围
+  let startTime = currentTime;
+  let endTime = currentTime + 30;  // 默认30秒，等下一个标注时修正
+  
+  // 查找前一个已标注段落，用它的结束时间作为参考
+  let prevEnd = 0;
+  for (let i = idx - 1; i >= 0; i--) {
+    if (annotated[i]) {
+      prevEnd = annotated[i].end;
+      break;
+    }
+  }
+  
+  // 查找下一个已标注段落
+  let nextStart = Infinity;
+  for (let i = idx + 1; i < totalSections; i++) {
+    if (annotated[i]) {
+      nextStart = annotated[i].start;
+      break;
+    }
+  }
+  
+  // 取前一段结束和当前时间的较大值作为开始
+  startTime = Math.max(currentTime, prevEnd);
+  endTime = Math.min(startTime + 30, nextStart);
+  
+  annotated[idx] = { start: Math.round(startTime * 10) / 10, end: Math.round(endTime * 10) / 10 };
+  
+  // 修正前一段的结束时间
+  if (idx > 0 && annotated[idx-1]) {
+    annotated[idx-1].end = Math.round(startTime * 10) / 10;
+  }
+  
+  // 更新界面
+  renderSections();
+  updateStats();
+  saveProgress();
+  
+  // 跳转到下一未标注段
+  let nextIdx = -1;
+  for (let i = idx + 1; i < totalSections; i++) {
+    if (!annotated[i]) { nextIdx = i; break; }
+  }
+  
+  if (nextIdx === -1) {
+    // 全部标完
+    isAnnotating = false;
+    document.getElementById('btnStart').disabled = false;
+    document.getElementById('btnStart').textContent = '▶ 全部完成!';
+    updateModeBanner();
+    alert('🎉 全部标注完成！点击"导出标注结果"发送给我。');
+    return;
+  }
+  
+  highlightSection(nextIdx);
+  document.getElementById('sec-' + nextIdx)?.scrollIntoView({ behavior: 'smooth' });
+  updateModeBanner();
+}
+
+function highlightSection(idx) {
+  document.querySelectorAll('.doc-section.active').forEach(el => el.classList.remove('active'));
+  const el = document.getElementById('sec-' + idx);
+  if (el) el.classList.add('active');
+  currentSection = idx;
+  
+  // 更新导航点
+  document.querySelectorAll('.scroll-nav .dot').forEach((dot, i) => {
+    dot.classList.toggle('current', i === idx);
+  });
+}
+
+// ===== 辅助函数 =====
+function getGlobalTime(player) {
+  const src = player.querySelector('source[src*="晋宁焰口上"]');
+  const isUpper = player.currentSrc.includes('晋宁焰口上') || (!player.currentSrc && player.currentTime < 8098);
+  
+  if (player.currentSrc.includes('晋宁焰口下') || player.currentSrc.includes('下.mp3')) {
+    return 8098 + player.currentTime;
+  }
+  return player.currentTime;
+}
+
+function playAtTime(seconds) {
+  const player = document.getElementById('audioPlayer');
+  if (seconds < 8098) {
+    player.querySelector('source[src*="上.mp3"]').removeAttribute('disabled');
+    player.querySelector('source[src*="下.mp3"]')?.setAttribute('disabled', '');
+    player.src = '晋宁焰口上.mp3';
+    player.currentTime = seconds;
+  } else {
+    player.querySelector('source[src*="上.mp3"]')?.setAttribute('disabled', '');
+    player.querySelector('source[src*="下.mp3"]')?.removeAttribute('disabled');
+    player.src = '晋宁焰口下.mp3';
+    player.currentTime = seconds - 8098;
+  }
+  player.play();
+}
+
+function fmt(seconds) {
+  if (seconds === undefined || seconds === null) return '--:--';
+  const h = Math.floor(seconds / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = Math.floor(seconds % 60);
+  return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${s.toString().padStart(2,'0')}`;
+}
+
+function escapeHtml(text) {
+  const d = document.createElement('div');
+  d.textContent = text;
+  return d.innerHTML;
+}
+
+function updateModeBanner() {
+  const banner = document.getElementById('modeBanner');
+  if (isAnnotating) {
+    const done = Object.keys(annotated).length;
+    banner.className = 'mode-banner mode-recording';
+    banner.textContent = `🔴 标注中 — 听音频 → 点击对应的经文段落 (${done}/${totalSections})`;
+  } else {
+    const done = Object.keys(annotated).length;
+    if (done >= totalSections) {
+      banner.className = 'mode-banner mode-idle';
+      banner.textContent = '✅ 全部标注完成！请导出结果';
+    } else if (done > 0) {
+      banner.className = 'mode-banner mode-idle';
+      banner.textContent = `⏸ 已暂停 — 已标注 ${done}/${totalSections} 段`;
+    } else {
+      banner.className = 'mode-banner mode-idle';
+      banner.textContent = '⏸ 待命 — 播放音频后点击【开始标注】';
+    }
+  }
+}
+
+function updateStats() {
+  const done = Object.keys(annotated).length;
+  document.getElementById('countDone').textContent = done;
+  const pct = Math.round(done / totalSections * 100);
+  document.getElementById('progressFill').style.width = pct + '%';
+}
+
+// ===== 导入导出 =====
+function exportData() {
+  const data = {
+    version: 1,
+    date: new Date().toISOString(),
+    totalSections: totalSections,
+    annotated: annotated,
+    audioFiles: ['晋宁焰口上.mp3', '晋宁焰口下.mp3']
+  };
+  document.getElementById('exportText').value = JSON.stringify(data, null, 2);
+  document.getElementById('exportModal').classList.add('show');
+}
+
+function copyExport() {
+  const text = document.getElementById('exportText');
+  text.select();
+  navigator.clipboard.writeText(text.value).then(() => {
+    alert('✅ 已复制，请发送给我！');
+  }).catch(() => {
+    document.execCommand('copy');
+    alert('✅ 请手动复制文本发送给我');
+  });
+}
+
+function importData(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = function(e) {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.annotated) {
+        annotated = data.annotated;
+        renderSections();
+        updateStats();
+        updateModeBanner();
+        alert(`✅ 已导入存档：${Object.keys(annotated).length} 段已标注`);
+      }
+    } catch(err) {
+      alert('❌ 文件格式错误');
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+function saveProgress() {
+  try {
+    const data = { annotated, totalSections };
+    localStorage.setItem('yankou_annotation', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadProgress() {
+  try {
+    const raw = localStorage.getItem('yankou_annotation');
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data.annotated) {
+        annotated = data.annotated;
+        renderSections();
+        updateStats();
+        updateModeBanner();
+      }
+    }
+  } catch(e) {}
+}
+
+function resetAll() {
+  if (!confirm('确定重置所有标注？此操作不可撤销。')) return;
+  annotated = {};
+  localStorage.removeItem('yankou_annotation');
+  renderSections();
+  updateStats();
+  updateModeBanner();
+  isAnnotating = false;
+  document.getElementById('btnStart').disabled = false;
+  document.getElementById('btnStart').textContent = '▶ 开 始 标 注';
+}
+
+function closeModal(id) {
+  document.getElementById(id).classList.remove('show');
+}
+
+// ===== 音频事件 =====
+document.getElementById('audioPlayer').addEventListener('timeupdate', function() {
+  const t = getGlobalTime(this);
+  document.getElementById('timeDisplay').textContent = fmt(t);
+});
+
+document.getElementById('audioPlayer').addEventListener('play', function() {
+  if (!isAnnotating) {
+    document.getElementById('btnStart').disabled = false;
+  }
+});
+
+// ===== 快捷键 =====
+document.addEventListener('keydown', function(e) {
+  const player = document.getElementById('audioPlayer');
+  
+  if (e.target.tagName === 'TEXTAREA' || e.target.tagName === 'INPUT') return;
+  
+  switch(e.key) {
+    case ' ':
+      e.preventDefault();
+      if (player.paused) player.play();
+      else player.pause();
+      break;
+    case 'Enter':
+      e.preventDefault();
+      if (isAnnotating && currentSection >= 0 && !annotated[currentSection]) {
+        markSection(currentSection);
+      } else if (!isAnnotating) {
+        startAnnotation();
+      }
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      let up = currentSection;
+      while (up > 0) {
+        up--;
+        if (!annotated[up]) {
+          highlightSection(up);
+          document.getElementById('sec-' + up)?.scrollIntoView({ behavior: 'smooth' });
+          break;
+        }
+      }
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      for (let i = currentSection + 1; i < totalSections; i++) {
+        if (!annotated[i]) {
+          highlightSection(i);
+          document.getElementById('sec-' + i)?.scrollIntoView({ behavior: 'smooth' });
+          break;
+        }
+      }
+      break;
+    case 'ArrowLeft':
+      player.currentTime = Math.max(0, player.currentTime - 5);
+      break;
+    case 'ArrowRight':
+      player.currentTime += 5;
+      break;
+  }
+});
+
+// ===== 加载完成时初始化 =====
+document.addEventListener('DOMContentLoaded', init);
+window.addEventListener('load', function() {
+  // 如果数据没嵌入，重试
+  if (!SECTION_DATA) init();
+});
+</script>
+</body>
+</html>
