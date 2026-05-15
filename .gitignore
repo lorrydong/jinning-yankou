@@ -1,0 +1,5 @@
+*.log
+.DS_Store
+node_modules
+audio-a.mp3
+audio-b.mp3

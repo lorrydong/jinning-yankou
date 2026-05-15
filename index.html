@@ -1,0 +1,1001 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes">
+<title>晋宁焰口 · 点读标注工具</title>
+<style>
+/* ========== Reset & Base ========== */
+*{margin:0;padding:0;box-sizing:border-box;user-select:none}
+body{
+  font-family:"Noto Serif CJK SC","SimSun","Songti SC",serif;
+  background:#0f0f1e;color:#e8d5b7;
+  min-height:100vh;display:flex;flex-direction:column;
+}
+
+/* ========== Header ========== */
+.header{
+  text-align:center;padding:12px 16px;
+  border-bottom:1px solid #2a2a4a;
+  display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:8px;
+}
+.header h1{font-size:18px;color:#f0d78a;white-space:nowrap}
+.header .sub{font-size:12px;color:#6a6a8a}
+.header-actions{display:flex;gap:6px;flex-wrap:wrap}
+
+/* ========== Buttons ========== */
+.btn{
+  padding:6px 14px;border:none;border-radius:5px;
+  font-size:13px;cursor:pointer;font-family:inherit;white-space:nowrap;
+  transition:opacity .2s,transform .1s;
+}
+.btn:active{transform:scale(0.96)}
+.btn-primary{background:#d4a843;color:#0f0f1e}
+.btn-primary:hover{background:#c49833}
+.btn-danger{background:#a33;color:#eee}
+.btn-danger:hover{background:#922}
+.btn-success{background:#2a8;color:#eee}
+.btn-success:hover{background:#197}
+.btn-warning{background:#c60;color:#eee}
+.btn-warning:hover{background:#b50}
+.btn-info{background:#358;color:#eee}
+.btn-info:hover{background:#247}
+.btn-sm{padding:4px 10px;font-size:12px}
+.btn-xs{padding:2px 8px;font-size:11px}
+
+/* ========== Main Layout ========== */
+.main-layout{
+  display:flex;flex:1;overflow:hidden;
+}
+
+/* ========== Page Viewer (Left) ========== */
+.page-viewer{
+  flex:1;display:flex;flex-direction:column;overflow:hidden;
+  position:relative;
+}
+.page-nav{
+  display:flex;align-items:center;justify-content:center;gap:10px;
+  padding:8px 12px;background:#1a1a30;border-bottom:1px solid #2a2a4a;
+}
+.page-nav .pnum{
+  width:60px;text-align:center;padding:4px 6px;border:1px solid #3a3a5e;
+  border-radius:4px;background:#0f0f1e;color:#e8d5b7;font-size:14px;
+  font-family:monospace;
+}
+.page-nav .pnum:focus{outline:none;border-color:#d4a843}
+.page-nav .total{color:#6a6a8a;font-size:13px}
+.page-canvas-wrap{
+  flex:1;overflow:auto;position:relative;
+  background:#0a0a18;
+  display:flex;justify-content:center;padding:10px;
+}
+.page-canvas-wrap img{
+  display:block;max-width:100%;
+  height:auto;cursor:crosshair;
+  box-shadow:0 0 20px rgba(0,0,0,.5);
+  border-radius:2px;
+}
+
+/* ========== Marker Overlay ========== */
+.image-container{
+  position:relative;display:inline-block;
+  max-width:100%;
+}
+.image-container img{max-width:100%;height:auto;display:block}
+.marker-overlay{
+  position:absolute;top:0;left:0;width:100%;height:100%;
+  pointer-events:none;
+}
+.marker{
+  position:absolute;
+  width:28px;height:28px;
+  transform:translate(-50%,-50%);
+  cursor:pointer;pointer-events:all;
+  border-radius:50%;
+  display:flex;align-items:center;justify-content:center;
+  font-size:14px;font-weight:bold;
+  box-shadow:0 2px 8px rgba(0,0,0,.6);
+  transition:transform .15s,box-shadow .15s;
+  z-index:10;
+}
+.marker:hover{transform:translate(-50%,-50%) scale(1.2);z-index:20}
+.marker.active{transform:translate(-50%,-50%) scale(1.3);z-index:30;box-shadow:0 0 0 3px #f0d78a,0 3px 12px rgba(0,0,0,.7)}
+.marker-上{background:#d4a843;color:#0f0f1e;border:2px solid #e8c060}
+.marker-下{background:#4a8ab5;color:#fff;border:2px solid #6aaad5}
+.marker .label{
+  position:absolute;bottom:calc(100% + 4px);left:50%;
+  transform:translateX(-50%);
+  background:rgba(0,0,0,.85);color:#e8d5b7;
+  font-size:11px;padding:2px 8px;border-radius:4px;
+  white-space:nowrap;pointer-events:none;
+  display:none;
+}
+.marker:hover .label,.marker.active .label{display:block}
+
+/* ========== Side Panel ========== */
+.side-panel{
+  width:340px;background:#151528;border-left:1px solid #2a2a4a;
+  display:flex;flex-direction:column;overflow:hidden;
+  flex-shrink:0;
+}
+.panel-tabs{
+  display:flex;border-bottom:1px solid #2a2a4a;
+}
+.panel-tab{
+  flex:1;padding:10px;text-align:center;cursor:pointer;
+  font-size:13px;color:#6a6a8a;border-bottom:2px solid transparent;
+  transition:all .2s;
+}
+.panel-tab:hover{color:#aaa}
+.panel-tab.active{color:#f0d78a;border-bottom-color:#f0d78a}
+.panel-content{flex:1;overflow-y:auto;padding:12px}
+
+/* ========== Marker List ========== */
+.marker-list{display:flex;flex-direction:column;gap:6px}
+.marker-item{
+  display:flex;align-items:center;gap:8px;
+  padding:8px 10px;background:#1e1e38;border-radius:6px;
+  cursor:pointer;transition:background .2s;
+  border-left:3px solid #d4a843;
+}
+.marker-item:hover{background:#282850}
+.marker-item.active{background:#282850;border-left-color:#f0d78a}
+.marker-item.下{border-left-color:#4a8ab5}
+.marker-item.下.active{border-left-color:#6aaad5}
+.marker-page{font-size:11px;color:#6a6a8a;min-width:40px}
+.marker-time{font-size:11px;color:#d4a843;font-family:monospace;min-width:60px}
+.marker-time.下{color:#4a8ab5}
+.marker-label{flex:1;font-size:13px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.marker-actions{display:flex;gap:4px}
+
+/* ========== Audio Player ========== */
+.audio-section{
+  padding:10px 12px;background:#0f0f1e;
+  border-top:1px solid #2a2a4a;
+}
+.audio-controls{
+  display:flex;align-items:center;gap:8px;flex-wrap:wrap;
+}
+.audio-btn{
+  width:36px;height:36px;border-radius:50%;border:2px solid #d4a843;
+  background:transparent;color:#d4a843;font-size:16px;
+  cursor:pointer;display:flex;align-items:center;justify-content:center;
+  transition:all .2s;flex-shrink:0;
+}
+.audio-btn:hover{background:#d4a843;color:#0f0f1e}
+.audio-btn.playing{background:#d4a843;color:#0f0f1e}
+.audio-source-select{
+  padding:4px 8px;background:#1a1a30;color:#e8d5b7;
+  border:1px solid #3a3a5e;border-radius:4px;font-size:12px;
+  font-family:inherit;
+}
+.audio-progress{
+  flex:1;display:flex;align-items:center;gap:6px;min-width:100px;
+}
+.audio-progress input[type=range]{
+  flex:1;height:4px;-webkit-appearance:none;
+  background:#2a2a4a;border-radius:2px;outline:none;
+}
+.audio-progress input[type=range]::-webkit-slider-thumb{
+  -webkit-appearance:none;width:14px;height:14px;
+  border-radius:50%;background:#d4a843;cursor:pointer;
+}
+.audio-time{
+  font-family:monospace;font-size:12px;color:#6a6a8a;white-space:nowrap;
+}
+
+/* ========== Add Marker Modal ========== */
+.modal-overlay{
+  display:none;position:fixed;top:0;left:0;right:0;bottom:0;
+  background:rgba(0,0,0,.7);z-index:1000;
+  align-items:center;justify-content:center;
+}
+.modal-overlay.show{display:flex}
+.modal{
+  background:#1a1a30;border:1px solid #3a3a5e;
+  border-radius:12px;padding:24px;width:90%;max-width:400px;
+  box-shadow:0 10px 40px rgba(0,0,0,.8);
+}
+.modal h3{color:#f0d78a;margin-bottom:16px;font-size:16px}
+.modal label{display:block;font-size:12px;color:#8a8aaa;margin-bottom:4px;margin-top:12px}
+.modal label:first-of-type{margin-top:0}
+.modal input[type=text],.modal input[type=number]{
+  width:100%;padding:8px 10px;border:1px solid #3a3a5e;border-radius:5px;
+  background:#0f0f1e;color:#e8d5b7;font-size:14px;font-family:inherit;
+}
+.modal input:focus{outline:none;border-color:#d4a843}
+.modal .hint{font-size:11px;color:#6a6a8a;margin-top:4px}
+.modal-actions{display:flex;gap:8px;margin-top:20px;justify-content:flex-end}
+
+/* ========== Marker Details (in side panel) ========== */
+.marker-detail{display:none}
+.marker-detail.show{display:block}
+.marker-detail h4{color:#f0d78a;font-size:14px;margin-bottom:8px}
+.marker-detail .row{display:flex;margin-bottom:6px;font-size:13px}
+.marker-detail .row .key{color:#6a6a8a;min-width:70px}
+.marker-detail .row .val{color:#ddd}
+.marker-detail .md-input{
+  width:100%;padding:6px 8px;border:1px solid #3a3a5e;border-radius:4px;
+  background:#0f0f1e;color:#e8d5b7;font-size:13px;margin-top:4px;font-family:inherit;
+}
+
+/* ========== Responsive ========== */
+@media(max-width:768px){
+  .main-layout{flex-direction:column}
+  .side-panel{width:100%;max-height:40vh;border-left:none;border-top:1px solid #2a2a4a}
+  .header h1{font-size:15px}
+  .marker{width:24px;height:24px;font-size:12px}
+}
+
+/* ========== Scrollbar ========== */
+::-webkit-scrollbar{width:6px;height:6px}
+::-webkit-scrollbar-track{background:#0f0f1e}
+::-webkit-scrollbar-thumb{background:#3a3a5e;border-radius:3px}
+::-webkit-scrollbar-thumb:hover{background:#5a5a7e}
+
+/* ========== Toast ========== */
+.toast{
+  position:fixed;bottom:30px;left:50%;transform:translateX(-50%);
+  padding:10px 24px;background:#d4a843;color:#0f0f1e;
+  border-radius:8px;font-size:14px;z-index:2000;
+  opacity:0;transition:opacity .3s;pointer-events:none;
+}
+.toast.show{opacity:1}
+
+/* ========== Empty state ========== */
+.empty-state{
+  text-align:center;padding:40px 20px;color:#5a5a7a;
+}
+.empty-state .icon{font-size:48px;margin-bottom:12px}
+.empty-state p{font-size:14px;margin-top:8px}
+
+/* ========== Time format in markers ========== */
+.marker-num{font-size:10px;opacity:.7}
+</style>
+</head>
+<body>
+
+<!-- ========== Header ========== -->
+<div class="header">
+  <div>
+    <h1>📿 晋宁焰口 · 点读标注</h1>
+    <div class="sub">瑜伽焰口施食要集 · 标记工具 v2</div>
+  </div>
+  <div class="header-actions">
+    <button class="btn btn-success btn-sm" onclick="saveMarkers()">💾 保存</button>
+    <button class="btn btn-info btn-sm" onclick="document.getElementById('importFile').click()">📂 导入</button>
+    <input type="file" id="importFile" accept=".json" style="display:none" onchange="importMarkers(event)">
+    <button class="btn btn-warning btn-sm" onclick="clearAllMarkers()">🗑️ 清空</button>
+  </div>
+</div>
+
+<!-- ========== Main Layout ========== -->
+<div class="main-layout">
+
+  <!-- Left: Page Viewer -->
+  <div class="page-viewer">
+    <div class="page-nav">
+      <button class="btn btn-primary btn-sm" onclick="goPage(-1)">◀</button>
+      <span class="total">第</span>
+      <input type="number" class="pnum" id="pageNum" value="1" min="1" max="203" onchange="jumpPage(this.value)">
+      <span class="total">/ 203 页</span>
+      <button class="btn btn-primary btn-sm" onclick="goPage(1)">▶</button>
+    </div>
+    <div class="page-canvas-wrap" id="pageCanvas">
+      <div class="image-container" id="imageContainer">
+        <img id="pageImage" src="" alt="页面加载中..." draggable="false">
+        <div class="marker-overlay" id="markerOverlay"></div>
+      </div>
+    </div>
+    <div class="audio-section">
+      <div class="audio-controls">
+        <button class="audio-btn" id="playBtn" onclick="togglePlay()">▶</button>
+        <select class="audio-source-select" id="audioSource" onchange="switchAudio()">
+          <option value="上">🔸 上半部</option>
+          <option value="下">🔹 下半部</option>
+        </select>
+        <div class="audio-progress">
+          <input type="range" id="seekBar" min="0" max="1000" value="0" oninput="seekAudio(this.value)">
+          <span class="audio-time" id="timeDisplay">00:00 / 00:00</span>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Right: Side Panel -->
+  <div class="side-panel">
+    <div class="panel-tabs">
+      <div class="panel-tab active" data-tab="markers" onclick="switchTab('markers')">📍 标记列表</div>
+      <div class="panel-tab" data-tab="detail" onclick="switchTab('detail')">📝 标记详情</div>
+      <div class="panel-tab" data-tab="help" onclick="switchTab('help')">❓ 使用说明</div>
+    </div>
+    <div class="panel-content" id="panelContent">
+      <!-- Markers list -->
+      <div id="markersTab" class="marker-list">
+        <div class="empty-state" id="emptyState">
+          <div class="icon">👆</div>
+          <p>还没有标记点</p>
+          <p style="font-size:12px;color:#4a4a6a">播放音频时点击图片添加标记</p>
+        </div>
+      </div>
+      <!-- Detail -->
+      <div id="detailTab" class="marker-detail">
+        <h4 id="detailTitle">标记详情</h4>
+        <div class="row"><span class="key">页面</span><span class="val" id="detailPage">-</span></div>
+        <div class="row"><span class="key">音频</span><span class="val" id="detailAudio">-</span></div>
+        <div class="row"><span class="key">时间</span><span class="val" id="detailTime">-</span></div>
+        <div class="row" style="flex-direction:column">
+          <span class="key">标签文字</span>
+          <input class="md-input" id="detailLabel" placeholder="可选：标注此处文字内容" onchange="updateDetail()">
+        </div>
+        <div class="row" style="flex-direction:column;margin-top:6px">
+          <span class="key">备注</span>
+          <input class="md-input" id="detailNote" placeholder="备注信息" onchange="updateDetail()">
+        </div>
+        <div class="modal-actions" style="margin-top:12px">
+          <button class="btn btn-danger btn-sm" onclick="deleteCurrentMarker()">🗑️ 删除此标记</button>
+          <button class="btn btn-primary btn-sm" onclick="jumpToMarker()">🎯 跳转播放</button>
+        </div>
+      </div>
+      <!-- Help -->
+      <div id="helpTab" style="display:none;font-size:13px;line-height:1.8;color:#aaa">
+        <h4 style="color:#f0d78a;margin-bottom:8px">🎯 操作说明</h4>
+        <p><b>添加标记：</b>播放音频时，点击图片上对应的文字位置，标记会自动添加当前播放时间。</p>
+        <p style="margin-top:8px"><b>播放标记：</b>点击图片上的标记点，或点击右侧列表中的项，音频跳转到对应位置播放。</p>
+        <p style="margin-top:8px"><b>调整位置：</b>拖拽标记点可微调位置。</p>
+        <p style="margin-top:8px"><b>自动保存：</b>标记数据自动保存在浏览器中，关闭后重新打开数据还在。</p>
+        <p style="margin-top:8px"><b>导出/导入：</b>用顶部按钮导出 JSON 备份，或导入之前导出的数据。</p>
+        <p style="margin-top:8px"><b>快捷键：</b></p>
+        <p>Space — 播放/暂停</p>
+        <p>← → — 快退/快进 5 秒</p>
+        <p>↑ ↓ — 上/下一页</p>
+        <p style="margin-top:8px;color:#6a6a8a">💡 建议：一边播放录音，眼睛看着法本，听到哪段就点哪段的位置。</p>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Add Marker Modal ========== -->
+<div class="modal-overlay" id="markerModal">
+  <div class="modal">
+    <h3>✏️ 新建标记</h3>
+    <label>标记时间（自动填入）</label>
+    <input type="text" id="modalTime" readonly style="font-family:monospace">
+    <label>标签文字（可选）</label>
+    <input type="text" id="modalLabel" placeholder="例如：南无阿弥陀佛" maxlength="30">
+    <div class="hint">添加在标记点旁显示的文字</div>
+    <label>备注（可选）</label>
+    <input type="text" id="modalNote" placeholder="备注信息">
+    <div class="modal-actions">
+      <button class="btn btn-warning" onclick="closeModal()">取消</button>
+      <button class="btn btn-success" onclick="confirmAddMarker()">✅ 确定添加</button>
+    </div>
+  </div>
+</div>
+
+<!-- ========== Toast ========== -->
+<div class="toast" id="toast"></div>
+
+<!-- ========== Audio ========== -->
+<audio id="audioPlayer" preload="metadata" style="display:none"></audio>
+
+<script>
+// ============================================================
+// STATE
+// ============================================================
+const TOTAL_PAGES = 203;
+let currentPage = 1;
+let markers = [];          // all markers
+let nextId = 1;
+let selectedMarker = null; // currently selected marker id
+let isAdding = false;      // modal pending state
+let pendingPos = null;     // {page, xPct, yPct}
+let audioReady = false;
+
+// ============================================================
+// DOM refs
+// ============================================================
+const pageImage = document.getElementById('pageImage');
+const markerOverlay = document.getElementById('markerOverlay');
+const imageContainer = document.getElementById('imageContainer');
+const audioPlayer = document.getElementById('audioPlayer');
+const playBtn = document.getElementById('playBtn');
+const seekBar = document.getElementById('seekBar');
+const timeDisplay = document.getElementById('timeDisplay');
+const pageNumInput = document.getElementById('pageNum');
+const markersTab = document.getElementById('markersTab');
+const emptyState = document.getElementById('emptyState');
+
+// ============================================================
+// INIT
+// ============================================================
+function init() {
+  loadMarkers();
+  loadPage(1);
+  // Auto-save every 30 seconds
+  setInterval(autoSave, 30000);
+  // Audio events
+  audioPlayer.addEventListener('timeupdate', onTimeUpdate);
+  audioPlayer.addEventListener('loadedmetadata', onMetaLoaded);
+  audioPlayer.addEventListener('play', () => playBtn.classList.add('playing'));
+  audioPlayer.addEventListener('pause', () => playBtn.classList.remove('playing'));
+  audioPlayer.addEventListener('ended', () => playBtn.classList.remove('playing'));
+  // Keyboard shortcuts
+  document.addEventListener('keydown', onKeyDown);
+  // Drag markers
+  initDrag();
+  // Image load event
+  pageImage.addEventListener('click', onImageClick);
+  pageImage.addEventListener('load', renderMarkers);
+  // Load audio initially
+  switchAudio();
+}
+
+// ============================================================
+// PAGE NAVIGATION
+// ============================================================
+function loadPage(n) {
+  currentPage = Math.max(1, Math.min(TOTAL_PAGES, n));
+  pageNumInput.value = currentPage;
+  pageImage.src = `pages/page-${String(currentPage).padStart(3,'0')}.png`;
+}
+
+function goPage(delta) { loadPage(currentPage + delta); }
+function jumpPage(n) { loadPage(parseInt(n) || 1); }
+
+// ============================================================
+// AUDIO
+// ============================================================
+let currentAudioSrc = '上';
+
+function switchAudio() {
+  currentAudioSrc = document.getElementById('audioSource').value;
+  const wasPlaying = !audioPlayer.paused;
+  const currentTime = audioPlayer.currentTime;
+  const src = currentAudioSrc === '上' ? 'audio-a.mp3' : 'audio-b.mp3';
+  
+  // Check if we need to switch source
+  const currentSrc = audioPlayer.getAttribute('data-src');
+  if (currentSrc === src) return;
+  
+  audioPlayer.setAttribute('data-src', src);
+  audioPlayer.src = src;
+  audioPlayer.load();
+  audioReady = false;
+  
+  // Restore playback state approximation
+  const that = audioPlayer;
+  that.addEventListener('loadedmetadata', function handler() {
+    that.removeEventListener('loadedmetadata', handler);
+    audioReady = true;
+    if (wasPlaying && currentTime > 0 && currentTime < that.duration) {
+      that.currentTime = currentTime;
+      that.play().catch(() => {});
+    }
+  }, {once: true});
+}
+
+function togglePlay() {
+  if (audioPlayer.paused) {
+    audioPlayer.play().catch(e => console.log('Play error:', e));
+  } else {
+    audioPlayer.pause();
+  }
+}
+
+function seekAudio(val) {
+  if (!audioReady || !audioPlayer.duration) return;
+  audioPlayer.currentTime = (val / 1000) * audioPlayer.duration;
+}
+
+function onTimeUpdate() {
+  if (!audioPlayer.duration) return;
+  const pct = (audioPlayer.currentTime / audioPlayer.duration) * 1000;
+  seekBar.value = Math.min(1000, Math.round(pct));
+  timeDisplay.textContent = formatTime(audioPlayer.currentTime) + ' / ' + formatTime(audioPlayer.duration);
+}
+
+function onMetaLoaded() {
+  audioReady = true;
+  onTimeUpdate();
+}
+
+function formatTime(s) {
+  if (!s || isNaN(s)) return '00:00';
+  const m = Math.floor(s / 60);
+  const sec = Math.floor(s % 60);
+  return String(m).padStart(2,'0') + ':' + String(sec).padStart(2,'0');
+}
+
+// ============================================================
+// IMAGE CLICK → ADD MARKER
+// ============================================================
+function onImageClick(e) {
+  const rect = e.target.getBoundingClientRect();
+  const x = e.clientX - rect.left;
+  const y = e.clientY - rect.top;
+  const xPct = (x / rect.width) * 100;
+  const yPct = (y / rect.height) * 100;
+  
+  // Capture current audio time
+  const currentTime = audioPlayer.currentTime || 0;
+  
+  pendingPos = {
+    page: currentPage,
+    xPct: Math.round(xPct * 10) / 10,
+    yPct: Math.round(yPct * 10) / 10,
+    audioFile: currentAudioSrc,
+    startTime: Math.round(currentTime * 100) / 100
+  };
+  
+  // Show modal
+  document.getElementById('modalTime').value = formatTime(currentTime) + ' (' + currentAudioSrc + '部)';
+  document.getElementById('modalLabel').value = '';
+  document.getElementById('modalNote').value = '';
+  document.getElementById('markerModal').classList.add('show');
+  setTimeout(() => document.getElementById('modalLabel').focus(), 100);
+}
+
+function closeModal() {
+  document.getElementById('markerModal').classList.remove('show');
+  pendingPos = null;
+}
+
+function confirmAddMarker() {
+  if (!pendingPos) return;
+  const label = document.getElementById('modalLabel').value.trim();
+  const note = document.getElementById('modalNote').value.trim();
+  
+  markers.push({
+    id: 'm-' + (nextId++),
+    page: pendingPos.page,
+    xPct: pendingPos.xPct,
+    yPct: pendingPos.yPct,
+    audioFile: pendingPos.audioFile,
+    startTime: pendingPos.startTime,
+    label: label,
+    note: note
+  });
+  
+  closeModal();
+  renderMarkers();
+  renderMarkerList();
+  saveMarkers();
+  showToast('✅ 标记已添加');
+}
+
+// ============================================================
+// RENDER MARKERS (overlay + list)
+// ============================================================
+function renderMarkers() {
+  const container = markerOverlay;
+  container.innerHTML = '';
+  
+  // Show markers only for current page
+  const pageMarkers = markers.filter(m => m.page === currentPage);
+  
+  for (const m of pageMarkers) {
+    const div = document.createElement('div');
+    div.className = `marker marker-${m.audioFile}`;
+    if (selectedMarker === m.id) div.classList.add('active');
+    div.style.left = m.xPct + '%';
+    div.style.top = m.yPct + '%';
+    div.setAttribute('data-id', m.id);
+    div.draggable = false;
+    
+    const num = markers.indexOf(m) + 1;
+    div.innerHTML = `<span class="marker-num">${num}</span><span class="label">${m.label || '🎵 ' + formatTime(m.startTime)}</span>`;
+    
+    div.addEventListener('click', (e) => {
+      e.stopPropagation();
+      selectMarker(m.id);
+    });
+    
+    container.appendChild(div);
+  }
+}
+
+function renderMarkerList() {
+  // Remove empty state if we have markers
+  const empty = document.getElementById('emptyState');
+  if (markers.length === 0) {
+    if (!empty) {
+      const e = document.createElement('div');
+      e.className = 'empty-state';
+      e.id = 'emptyState';
+      e.innerHTML = '<div class="icon">👆</div><p>还没有标记点</p><p style="font-size:12px;color:#4a4a6a">播放音频时点击图片添加标记</p>';
+      markersTab.insertBefore(e, markersTab.firstChild);
+    }
+    // Remove all marker items
+    markersTab.querySelectorAll('.marker-item').forEach(el => el.remove());
+    return;
+  }
+  
+  // Remove empty state
+  const es = document.getElementById('emptyState');
+  if (es) es.remove();
+  
+  // Remove existing items
+  markersTab.querySelectorAll('.marker-item').forEach(el => el.remove());
+  
+  for (let i = 0; i < markers.length; i++) {
+    const m = markers[i];
+    const item = document.createElement('div');
+    item.className = `marker-item ${m.audioFile}`;
+    if (selectedMarker === m.id) item.classList.add('active');
+    item.setAttribute('data-id', m.id);
+    
+    item.innerHTML = `
+      <span class="marker-page">P${m.page}</span>
+      <span class="marker-time ${m.audioFile}">${formatTime(m.startTime)}</span>
+      <span class="marker-label">${m.label || '🎵'}</span>
+      <div class="marker-actions">
+        <button class="btn btn-xs btn-info" onclick="event.stopPropagation();selectMarker('${m.id}')">📝</button>
+        <button class="btn btn-xs btn-danger" onclick="event.stopPropagation();deleteMarker('${m.id}')">✕</button>
+      </div>
+    `;
+    
+    item.addEventListener('click', () => playMarker(m.id));
+    markersTab.appendChild(item);
+  }
+}
+
+// ============================================================
+// MARKER SELECTION & DETAIL
+// ============================================================
+function selectMarker(id) {
+  selectedMarker = id;
+  renderMarkers();
+  renderMarkerList();
+  
+  const m = markers.find(x => x.id === id);
+  if (m) {
+    document.getElementById('detailPage').textContent = '第 ' + m.page + ' 页';
+    document.getElementById('detailAudio').textContent = m.audioFile === '上' ? '上半部' : '下半部';
+    document.getElementById('detailTime').textContent = formatTime(m.startTime);
+    document.getElementById('detailLabel').value = m.label || '';
+    document.getElementById('detailNote').value = m.note || '';
+    document.getElementById('detailTitle').textContent = '📝 标记 #' + (markers.indexOf(m) + 1);
+    
+    switchTab('detail');
+  }
+}
+
+function updateDetail() {
+  const m = markers.find(x => x.id === selectedMarker);
+  if (!m) return;
+  m.label = document.getElementById('detailLabel').value.trim();
+  m.note = document.getElementById('detailNote').value.trim();
+  renderMarkers();
+  renderMarkerList();
+  autoSave();
+}
+
+function deleteCurrentMarker() {
+  if (!selectedMarker) return;
+  deleteMarker(selectedMarker);
+}
+
+function deleteMarker(id) {
+  markers = markers.filter(m => m.id !== id);
+  if (selectedMarker === id) selectedMarker = null;
+  renderMarkers();
+  renderMarkerList();
+  autoSave();
+  showToast('🗑️ 标记已删除');
+}
+
+function jumpToMarker() {
+  const m = markers.find(x => x.id === selectedMarker);
+  if (!m) return;
+  playMarker(m.id);
+}
+
+function playMarker(id) {
+  const m = markers.find(x => x.id === id);
+  if (!m) return;
+  
+  // Switch audio source if needed
+  if (m.audioFile !== currentAudioSrc) {
+    document.getElementById('audioSource').value = m.audioFile;
+    switchAudio();
+  }
+  
+  // Jump to page
+  if (m.page !== currentPage) {
+    loadPage(m.page);
+    // Wait for image to load, then highlight
+    pageImage.onload = () => {
+      selectMarker(m.id);
+      setTimeout(() => {
+        const el = document.querySelector(`.marker[data-id="${m.id}"]`);
+        if (el) el.scrollIntoView({behavior:'smooth', block:'center'});
+      }, 100);
+    };
+  } else {
+    selectMarker(m.id);
+  }
+  
+  // Wait a tick then play
+  setTimeout(() => {
+    audioPlayer.currentTime = m.startTime;
+    audioPlayer.play().catch(() => {});
+  }, 200);
+  
+  // Reset onload
+  pageImage.onload = null;
+}
+
+// ============================================================
+// CLEAR ALL
+// ============================================================
+function clearAllMarkers() {
+  if (markers.length === 0) return;
+  if (!confirm('确定要清空所有标记吗？（此操作不可撤销）')) return;
+  markers = [];
+  selectedMarker = null;
+  renderMarkers();
+  renderMarkerList();
+  saveMarkers();
+  showToast('🗑️ 已清空所有标记');
+}
+
+// ============================================================
+// SAVE / LOAD / IMPORT
+// ============================================================
+function saveMarkers() {
+  const data = { version: 2, nextId, markers };
+  try {
+    localStorage.setItem('jnyk-markers-v2', JSON.stringify(data));
+    showToast('💾 已保存 ' + markers.length + ' 个标记');
+  } catch(e) {
+    showToast('❌ 保存失败：' + e.message);
+  }
+}
+
+function autoSave() {
+  if (markers.length === 0) return;
+  const data = { version: 2, nextId, markers };
+  try {
+    localStorage.setItem('jnyk-markers-v2', JSON.stringify(data));
+  } catch(e) {}
+}
+
+function loadMarkers() {
+  try {
+    const raw = localStorage.getItem('jnyk-markers-v2');
+    if (raw) {
+      const data = JSON.parse(raw);
+      if (data.markers && Array.isArray(data.markers)) {
+        markers = data.markers;
+        nextId = data.nextId || (markers.length + 1);
+        renderMarkers();
+        renderMarkerList();
+        return true;
+      }
+    }
+  } catch(e) {}
+  return false;
+}
+
+function importMarkers(event) {
+  const file = event.target.files[0];
+  if (!file) return;
+  const reader = new FileReader();
+  reader.onload = (e) => {
+    try {
+      const data = JSON.parse(e.target.result);
+      if (data.markers && Array.isArray(data.markers)) {
+        markers = data.markers;
+        nextId = data.nextId || (markers.length + 1);
+        renderMarkers();
+        renderMarkerList();
+        saveMarkers();
+        showToast('✅ 已导入 ' + markers.length + ' 个标记');
+      } else {
+        showToast('❌ 文件格式不正确');
+      }
+    } catch(e2) {
+      showToast('❌ 导入失败：' + e2.message);
+    }
+  };
+  reader.readAsText(file);
+  event.target.value = '';
+}
+
+// Export function
+function exportMarkers() {
+  const data = { version: 2, nextId, markers, exportedAt: new Date().toISOString() };
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type:'application/json'});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = '晋宁焰口标注_' + new Date().toISOString().slice(0,10) + '.json';
+  a.click();
+  URL.revokeObjectURL(url);
+  showToast('📂 已导出 ' + markers.length + ' 个标记');
+}
+
+// ============================================================
+// DRAG MARKERS
+// ============================================================
+function initDrag() {
+  let dragId = null, startX, startY, startLeft, startTop;
+  
+  document.addEventListener('mousedown', (e) => {
+    const marker = e.target.closest('.marker');
+    if (!marker) return;
+    if (e.target.closest('.label')) return;
+    
+    dragId = marker.getAttribute('data-id');
+    const rect = marker.getBoundingClientRect();
+    const containerRect = markerOverlay.getBoundingClientRect();
+    
+    startX = e.clientX;
+    startY = e.clientY;
+    startLeft = parseFloat(marker.style.left);
+    startTop = parseFloat(marker.style.top);
+    
+    e.preventDefault();
+  });
+  
+  document.addEventListener('mousemove', (e) => {
+    if (!dragId) return;
+    const marker = document.querySelector(`.marker[data-id="${dragId}"]`);
+    if (!marker) return;
+    
+    const dx = e.clientX - startX;
+    const dy = e.clientY - startY;
+    const containerRect = markerOverlay.getBoundingClientRect();
+    const pctDx = (dx / containerRect.width) * 100;
+    const pctDy = (dy / containerRect.height) * 100;
+    
+    const newLeft = Math.max(0, Math.min(100, startLeft + pctDx));
+    const newTop = Math.max(0, Math.min(100, startTop + pctDy));
+    
+    marker.style.left = newLeft + '%';
+    marker.style.top = newTop + '%';
+  });
+  
+  document.addEventListener('mouseup', (e) => {
+    if (!dragId) return;
+    const marker = document.querySelector(`.marker[data-id="${dragId}"]`);
+    if (marker) {
+      const mL = parseFloat(marker.style.left);
+      const mT = parseFloat(marker.style.top);
+      const mData = markers.find(m => m.id === dragId);
+      if (mData) {
+        mData.xPct = Math.round(mL * 10) / 10;
+        mData.yPct = Math.round(mT * 10) / 10;
+        autoSave();
+      }
+    }
+    dragId = null;
+  });
+  
+  // Touch support
+  let touchId = null;
+  document.addEventListener('touchstart', (e) => {
+    const marker = e.target.closest('.marker');
+    if (!marker) return;
+    if (e.target.closest('.label')) return;
+    
+    touchId = marker.getAttribute('data-id');
+    const touch = e.touches[0];
+    const rect = marker.getBoundingClientRect();
+    const containerRect = markerOverlay.getBoundingClientRect();
+    
+    startX = touch.clientX;
+    startY = touch.clientY;
+    startLeft = parseFloat(marker.style.left);
+    startTop = parseFloat(marker.style.top);
+    
+    e.preventDefault();
+  }, {passive: false});
+  
+  document.addEventListener('touchmove', (e) => {
+    if (!touchId) return;
+    const marker = document.querySelector(`.marker[data-id="${touchId}"]`);
+    if (!marker) return;
+    
+    const touch = e.touches[0];
+    const dx = touch.clientX - startX;
+    const dy = touch.clientY - startY;
+    const containerRect = markerOverlay.getBoundingClientRect();
+    const pctDx = (dx / containerRect.width) * 100;
+    const pctDy = (dy / containerRect.height) * 100;
+    
+    marker.style.left = Math.max(0, Math.min(100, startLeft + pctDx)) + '%';
+    marker.style.top = Math.max(0, Math.min(100, startTop + pctDy)) + '%';
+    
+    e.preventDefault();
+  }, {passive: false});
+  
+  document.addEventListener('touchend', (e) => {
+    if (!touchId) return;
+    const marker = document.querySelector(`.marker[data-id="${touchId}"]`);
+    if (marker) {
+      const mData = markers.find(m => m.id === touchId);
+      if (mData) {
+        mData.xPct = Math.round(parseFloat(marker.style.left) * 10) / 10;
+        mData.yPct = Math.round(parseFloat(marker.style.top) * 10) / 10;
+        autoSave();
+      }
+    }
+    touchId = null;
+  });
+}
+
+// ============================================================
+// TAB SWITCH
+// ============================================================
+function switchTab(tab) {
+  document.querySelectorAll('.panel-tab').forEach(el => el.classList.remove('active'));
+  document.querySelector(`.panel-tab[data-tab="${tab}"]`).classList.add('active');
+  
+  document.getElementById('markersTab').style.display = tab === 'markers' ? 'flex' : 'none';
+  document.getElementById('detailTab').style.display = tab === 'detail' ? 'block' : 'none';
+  document.getElementById('helpTab').style.display = tab === 'help' ? 'block' : 'none';
+}
+
+// ============================================================
+// KEYBOARD SHORTCUTS
+// ============================================================
+function onKeyDown(e) {
+  // Don't intercept if typing in inputs
+  if (e.target.tagName === 'INPUT') return;
+  
+  switch(e.code) {
+    case 'Space':
+      e.preventDefault();
+      togglePlay();
+      break;
+    case 'ArrowLeft':
+      e.preventDefault();
+      audioPlayer.currentTime = Math.max(0, audioPlayer.currentTime - 5);
+      break;
+    case 'ArrowRight':
+      e.preventDefault();
+      audioPlayer.currentTime = Math.min(audioPlayer.duration || Infinity, audioPlayer.currentTime + 5);
+      break;
+    case 'ArrowUp':
+      e.preventDefault();
+      goPage(-1);
+      break;
+    case 'ArrowDown':
+      e.preventDefault();
+      goPage(1);
+      break;
+    case 'KeyS':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        saveMarkers();
+      }
+      break;
+    case 'KeyE':
+      if (e.ctrlKey || e.metaKey) {
+        e.preventDefault();
+        exportMarkers();
+      }
+      break;
+  }
+}
+
+// ============================================================
+// TOAST
+// ============================================================
+function showToast(msg) {
+  const el = document.getElementById('toast');
+  el.textContent = msg;
+  el.classList.add('show');
+  clearTimeout(el._timer);
+  el._timer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ============================================================
+// START
+// ============================================================
+init();
+</script>
+</body>
+</html>
