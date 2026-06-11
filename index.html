@@ -10,7 +10,7 @@
 body{
   font-family:"Noto Serif CJK SC","SimSun","Songti SC",serif;
   background:#0f0f1e;color:#e8d5b7;
-  min-height:100vh;display:flex;flex-direction:column;
+  height:100vh;height:100dvh;overflow:hidden;display:flex;flex-direction:column;
 }
 
 /* ========== Header ========== */
@@ -68,6 +68,7 @@ body{
   flex:1;overflow:auto;position:relative;
   background:#0a0a18;
   display:flex;justify-content:center;padding:10px;
+  touch-action:manipulation;
 }
 .page-canvas-wrap img{
   display:block;max-width:100%;
@@ -237,9 +238,15 @@ body{
 /* ========== Responsive ========== */
 @media(max-width:768px){
   .main-layout{flex-direction:column}
-  .side-panel{width:100%;max-height:40vh;border-left:none;border-top:1px solid #2a2a4a}
-  .header h1{font-size:15px}
+  .side-panel{width:100%;max-height:35vh;border-left:none;border-top:1px solid #2a2a4a}
+  .header{padding:8px 10px}
+  .header h1{font-size:14px}
+  .header .sub{font-size:11px}
   .marker{width:24px;height:24px;font-size:12px}
+  .audio-section{padding:6px 8px}
+  .audio-controls{gap:6px}
+  .audio-btn{width:32px;height:32px;font-size:14px}
+  .seek-btn-30,.seek-btn-10{padding:4px 8px;font-size:11px}
 }
 
 /* ========== Scrollbar ========== */
@@ -247,6 +254,21 @@ body{
 ::-webkit-scrollbar-track{background:#0f0f1e}
 ::-webkit-scrollbar-thumb{background:#3a3a5e;border-radius:3px}
 ::-webkit-scrollbar-thumb:hover{background:#5a5a7e}
+
+/* ========== Swipe Hint ========== */
+.swipe-hint{
+  position:absolute;top:50%;left:50%;
+  transform:translate(-50%,-50%);
+  pointer-events:none;z-index:100;
+  opacity:0;transition:opacity .15s;
+  font-size:40px;color:#d4a843;
+  text-shadow:0 2px 12px rgba(0,0,0,.8);
+}
+.swipe-hint.show{opacity:.9}
+
+/* ========== Page fade transition ========== */
+.image-container.fade-out{opacity:0;transition:opacity .12s ease}
+.image-container.fade-in{opacity:1;transition:opacity .1s ease}
 
 /* ========== Toast ========== */
 .toast{
@@ -266,9 +288,65 @@ body{
 
 /* ========== Time format in markers ========== */
 .marker-num{font-size:10px;opacity:.7}
+
+/* ========== Cache Indicator ========== */
+.cache-indicator{
+  position:fixed;bottom:12px;right:12px;z-index:999;
+  display:flex;flex-direction:column;align-items:flex-end;gap:6px;
+  font-size:12px;pointer-events:none;
+}
+.cache-indicator *{pointer-events:auto}
+.cache-badge{
+  padding:5px 10px;border-radius:14px;font-size:11px;
+  color:#fff;white-space:nowrap;cursor:pointer;
+  transition:all .3s;backdrop-filter:blur(4px);
+}
+.cache-badge.offline-ready{background:rgba(42,136,42,0.85)}
+.cache-badge.caching{background:rgba(212,168,67,0.85);animation:pulse 1.5s infinite}
+.cache-badge.online{background:rgba(90,90,122,0.7)}
+.cache-badge.error{background:rgba(170,51,51,0.85)}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:.6}}
+.cache-panel{
+  display:none;flex-direction:column;gap:6px;
+  background:rgba(15,15,30,.95);border:1px solid #3a3a5e;
+  border-radius:8px;padding:12px;min-width:220px;max-width:280px;
+  box-shadow:0 4px 20px rgba(0,0,0,.6);
+}
+.cache-panel.show{display:flex}
+.cache-panel h4{color:#f0d78a;font-size:13px;margin:0 0 4px;text-align:center}
+.cache-row{display:flex;justify-content:space-between;align-items:center;font-size:11px;color:#8a8aaa}
+.cache-row .val{color:#e8d5b7;font-family:monospace}
+.cache-row .val.done{color:#4a8}
+.cache-progress{width:100%;height:4px;background:#2a2a4a;border-radius:2px;overflow:hidden}
+.cache-progress .fill{height:100%;background:linear-gradient(90deg,#d4a843,#f0d78a);width:0%;transition:width .3s}
+.cache-panel .cache-btn{
+  padding:5px 12px;border:1px solid #d4a843;border-radius:4px;
+  background:transparent;color:#d4a843;font-size:11px;cursor:pointer;
+  font-family:inherit;margin-top:4px;transition:all .15s;
+}
+.cache-panel .cache-btn:hover{background:#d4a843;color:#0f0f1e}
+.cache-panel .cache-btn:disabled{opacity:.4;cursor:not-allowed}
+@media(max-width:768px){
+  .cache-indicator{bottom:6px;right:6px}
+}
 </style>
 </head>
 <body>
+
+<!-- ========== Cache Indicator ========== -->
+<div class="cache-indicator" id="cacheIndicator">
+  <span class="cache-badge online" id="cacheBadge" onclick="toggleCachePanel()">📡 在线</span>
+  <div class="cache-panel" id="cachePanel">
+    <h4>🗄️ 离线缓存状态</h4>
+    <div class="cache-row"><span>页面图片</span><span class="val" id="cachePages">— / 203</span></div>
+    <div class="cache-progress"><div class="fill" id="cachePagesBar"></div></div>
+    <div class="cache-row"><span>音频文件</span><span class="val" id="cacheAudio">— / 2</span></div>
+    <div class="cache-progress"><div class="fill" id="cacheAudioBar"></div></div>
+    <div class="cache-row" style="margin-top:4px"><span>状态</span><span class="val" id="cacheOverall">检查中…</span></div>
+    <button class="cache-btn" id="cacheAllBtn" onclick="precacheAll()">📦 预缓存全部</button>
+    <button class="cache-btn" id="cachePagesBtn" onclick="precachePages()" style="border-color:#4a8ab5;color:#4a8ab5">🖼️ 仅缓存页面</button>
+  </div>
+</div>
 
 <!-- ========== Header ========== -->
 <div class="header">
@@ -398,9 +476,245 @@ body{
 <div class="toast" id="toast"></div>
 
 <!-- ========== Audio ========== -->
-<audio id="audioPlayer" preload="metadata" style="display:none"></audio>
+<audio id="audioPlayer" preload="auto" style="display:none"></audio>
 
 <script>
+// ============================================================
+// SERVICE WORKER (Offline Cache)
+// ============================================================
+let swReady = false;
+window._fallback = false;
+
+if ('serviceWorker' in navigator) {
+  let swTimeout;
+  
+  // Fallback timeout: if SW doesn't respond in 3s, assume HTTP/no-SW
+  swTimeout = setTimeout(() => {
+    if (document.getElementById('cacheOverall').textContent === '检查中…') {
+      useFallbackMode();
+    }
+  }, 3000);
+  
+  navigator.serviceWorker.register('/sw.js').then(reg => {
+    clearTimeout(swTimeout);
+    console.log('SW registered:', reg.scope);
+    if (navigator.serviceWorker.controller) {
+      navigator.serviceWorker.controller.postMessage({ action: 'cacheStatus' });
+      // Still timeout if no response
+      swTimeout = setTimeout(() => {
+        if (document.getElementById('cacheOverall').textContent === '检查中…') {
+          useFallbackMode();
+        }
+      }, 3000);
+    } else {
+      navigator.serviceWorker.addEventListener('controllerchange', () => {
+        clearTimeout(swTimeout);
+        navigator.serviceWorker.controller.postMessage({ action: 'cacheStatus' });
+        swTimeout = setTimeout(() => {
+          if (document.getElementById('cacheOverall').textContent === '检查中…') {
+            useFallbackMode();
+          }
+        }, 3000);
+      });
+    }
+  }).catch(err => {
+    clearTimeout(swTimeout);
+    console.warn('SW registration failed:', err);
+    useFallbackMode();
+  });
+
+  navigator.serviceWorker.addEventListener('message', event => {
+    const { action } = event.data;
+    clearTimeout(swTimeout);
+    if (action === 'cacheStatus') updateCacheUI(event.data);
+    else if (action === 'cacheProgress') updateProgress(event.data);
+    else if (action === 'cacheComplete') cacheComplete(event.data);
+  });
+} else {
+  useFallbackMode();
+}
+
+function useFallbackMode() {
+  window._fallback = true;
+  const badge = document.getElementById('cacheBadge');
+  badge.className = 'cache-badge online';
+  badge.textContent = '📡 在线';
+  document.getElementById('cacheOverall').textContent = '需联网 · 点击预缓存';
+  document.getElementById('cachePages').textContent = '0 / 203';
+  document.getElementById('cacheAudio').textContent = '0 / 2';
+  // Show both buttons - they trigger fetch-based pre-caching
+  document.getElementById('cacheAllBtn').style.display = '';
+  document.getElementById('cacheAllBtn').textContent = '📦 预缓存全部（推荐）';
+  document.getElementById('cachePagesBtn').textContent = '🖼️ 仅缓存页面';
+}
+
+// Fetch-based pre-caching (fallback when no Service Worker)
+function fetchPrecache(pageOnly) {
+  const CONC = 5; // concurrent fetches
+  const totalPages = 203;
+  const tasks = [];
+
+  // Build page tasks
+  for (let i = 1; i <= totalPages; i++) {
+    tasks.push({
+      type: 'page',
+      idx: i,
+      total: totalPages,
+      url: 'pages/page-' + String(i).padStart(3, '0') + '.png'
+    });
+  }
+
+  // Build audio tasks (unless pageOnly)
+  if (!pageOnly) {
+    tasks.push(
+      { type: 'audio', idx: 1, total: 2, url: 'audio-a.mp3', file: 'audio-a.mp3' },
+      { type: 'audio', idx: 2, total: 2, url: 'audio-b.mp3', file: 'audio-b.mp3' }
+    );
+  }
+
+  let pageDone = 0, audioDone = 0;
+  const allPages = totalPages;
+  const allAudio = pageOnly ? 0 : 2;
+
+  function reportProgress(task, ok) {
+    if (task.type === 'page') {
+      pageDone++;
+      document.getElementById('cachePages').textContent = pageDone + ' / ' + task.total;
+      document.getElementById('cachePagesBar').style.width = (pageDone / allPages * 100) + '%';
+      document.getElementById('cacheBadge').textContent = '📥 页面 ' + pageDone + '/' + allPages;
+      document.getElementById('cacheBadge').className = 'cache-badge caching';
+    } else {
+      audioDone++;
+      document.getElementById('cacheAudio').textContent = audioDone + ' / ' + task.total;
+      document.getElementById('cacheAudioBar').style.width = (audioDone / allAudio * 100) + '%';
+      document.getElementById('cacheBadge').textContent = '📥 音频: ' + task.file;
+      document.getElementById('cacheBadge').className = 'cache-badge caching';
+    }
+  }
+
+  function finalize() {
+    const allDone = pageDone >= allPages && audioDone >= allAudio;
+    if (allDone) {
+      document.getElementById('cacheBadge').className = 'cache-badge offline-ready';
+      document.getElementById('cacheBadge').textContent = '📴 离线就绪 ✅';
+      document.getElementById('cacheOverall').textContent = '可离线使用';
+      document.getElementById('cacheOverall').className = 'val done';
+    }
+    document.getElementById('cacheAllBtn').disabled = false;
+    document.getElementById('cachePagesBtn').disabled = false;
+  }
+
+  // Process with concurrency limit
+  let idx = 0;
+  function next() {
+    if (idx >= tasks.length) {
+      if (idx === tasks.length && pageDone + audioDone >= tasks.length) finalize();
+      return;
+    }
+    const task = tasks[idx++];
+    fetch(task.url, { cache: 'force-cache' })
+      .then(function(r) { reportProgress(task, r.ok); return r.blob(); })
+      .catch(function() { reportProgress(task, false); })
+      .finally(function() { next(); });
+  }
+  // Start initial CONC workers
+  for (let i = 0; i < CONC; i++) next();
+
+  // Poll for completion (all workers done)
+  const checkDone = setInterval(function() {
+    if (pageDone >= allPages && audioDone >= allAudio) {
+      clearInterval(checkDone);
+      finalize();
+    }
+  }, 500);
+}
+
+function updateCacheUI(data) {
+  const { pages, totalPages, audio, totalAudio } = data;
+  const pagesReady = pages >= totalPages;
+  const audioReady = audio >= totalAudio;
+  const allReady = pagesReady && audioReady;
+
+  document.getElementById('cachePages').textContent = pages + ' / ' + totalPages;
+  document.getElementById('cachePages').className = pagesReady ? 'val done' : 'val';
+  document.getElementById('cachePagesBar').style.width = (pages / totalPages * 100) + '%';
+
+  document.getElementById('cacheAudio').textContent = audio + ' / ' + totalAudio;
+  document.getElementById('cacheAudio').className = audioReady ? 'val done' : 'val';
+  document.getElementById('cacheAudioBar').style.width = (audio / totalAudio * 100) + '%';
+
+  const badge = document.getElementById('cacheBadge');
+  const overall = document.getElementById('cacheOverall');
+  if (allReady) {
+    badge.className = 'cache-badge offline-ready';
+    badge.textContent = '📴 离线就绪 ✅';
+    overall.textContent = '可离线使用';
+    overall.className = 'val done';
+  } else if (pages > 0 || audio > 0) {
+    badge.className = 'cache-badge caching';
+    badge.textContent = '📥 缓存中…';
+    overall.textContent = '部分可用';
+    overall.className = 'val';
+  } else {
+    badge.className = 'cache-badge online';
+    badge.textContent = '📡 在线';
+    overall.textContent = '需联网';
+    overall.className = 'val';
+  }
+}
+
+function updateProgress(data) {
+  const { type, current, total } = data;
+  if (type === 'page') {
+    document.getElementById('cachePages').textContent = current + ' / ' + total;
+    document.getElementById('cachePagesBar').style.width = (current / total * 100) + '%';
+    document.getElementById('cacheBadge').textContent = '📥 页面 ' + current + '/' + total;
+    document.getElementById('cacheBadge').className = 'cache-badge caching';
+  } else if (type === 'audio') {
+    document.getElementById('cacheAudio').textContent = current + ' / ' + total;
+    document.getElementById('cacheAudioBar').style.width = (current / total * 100) + '%';
+    document.getElementById('cacheBadge').textContent = '📥 音频: ' + data.file;
+    document.getElementById('cacheBadge').className = 'cache-badge caching';
+  }
+}
+
+function cacheComplete(data) {
+  if (!window._fallback && navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ action: 'cacheStatus' });
+  }
+  document.getElementById('cacheAllBtn').disabled = false;
+  document.getElementById('cachePagesBtn').disabled = false;
+}
+
+function precacheAll() {
+  document.getElementById('cacheAllBtn').disabled = true;
+  document.getElementById('cachePagesBtn').disabled = true;
+  document.getElementById('cacheBadge').textContent = '📥 开始缓存…';
+  document.getElementById('cacheBadge').className = 'cache-badge caching';
+  if (window._fallback) {
+    fetchPrecache(false);
+  } else if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ action: 'precacheAll' });
+    navigator.serviceWorker.controller.postMessage({ action: 'precacheAudio' });
+  }
+}
+
+function precachePages() {
+  document.getElementById('cacheAllBtn').disabled = true;
+  document.getElementById('cachePagesBtn').disabled = true;
+  document.getElementById('cacheBadge').textContent = '📥 缓存页面…';
+  document.getElementById('cacheBadge').className = 'cache-badge caching';
+  if (window._fallback) {
+    fetchPrecache(true);
+  } else if (navigator.serviceWorker.controller) {
+    navigator.serviceWorker.controller.postMessage({ action: 'precacheAll' });
+  }
+}
+
+function toggleCachePanel() {
+  document.getElementById('cachePanel').classList.toggle('show');
+}
+
 // ============================================================
 // STATE
 // ============================================================
@@ -447,7 +761,14 @@ function init() {
   initDrag();
   // Image load event
   pageImage.addEventListener('click', onImageClick);
-  pageImage.addEventListener('load', renderMarkers);
+  pageImage.addEventListener('load', () => {
+    renderMarkers();
+    imageContainer.classList.remove('fade-out');
+    imageContainer.classList.add('fade-in');
+    setTimeout(() => imageContainer.classList.remove('fade-in'), 150);
+  });
+  // Touch swipe for page navigation (mobile)
+  initTouchSwipe();
   // Load audio initially
   switchAudio();
 }
@@ -614,7 +935,7 @@ function renderMarkers() {
     
     div.addEventListener('click', (e) => {
       e.stopPropagation();
-      selectMarker(m.id);
+      playMarker(m.id);
     });
     
     container.appendChild(div);
@@ -730,7 +1051,6 @@ function playMarker(id) {
   // Jump to page
   if (m.page !== currentPage) {
     loadPage(m.page);
-    // Wait for image to load, then highlight
     pageImage.onload = () => {
       selectMarker(m.id);
       setTimeout(() => {
@@ -742,13 +1062,18 @@ function playMarker(id) {
     selectMarker(m.id);
   }
   
-  // Wait a tick then play
-  setTimeout(() => {
+  // Seek and play — wait for audio to be ready
+  if (audioReady) {
     audioPlayer.currentTime = m.startTime;
     audioPlayer.play().catch(() => {});
-  }, 200);
+  } else {
+    audioPlayer.addEventListener('canplay', function handler() {
+      audioPlayer.removeEventListener('canplay', handler);
+      audioPlayer.currentTime = m.startTime;
+      audioPlayer.play().catch(() => {});
+    }, {once: true});
+  }
   
-  // Reset onload
   pageImage.onload = null;
 }
 
@@ -1016,6 +1341,91 @@ function showToast(msg) {
   el.classList.add('show');
   clearTimeout(el._timer);
   el._timer = setTimeout(() => el.classList.remove('show'), 2000);
+}
+
+// ============================================================
+// HORIZONTAL SWIPE PAGE NAVIGATION (left→right=next, right→left=prev)
+// ============================================================
+function initTouchSwipe() {
+  const pageCanvas = document.getElementById('pageCanvas');
+  const imgContainer = document.getElementById('imageContainer');
+  
+  // Create horizontal swipe direction hint
+  const hint = document.createElement('div');
+  hint.className = 'swipe-hint';
+  hint.textContent = '◀';
+  imgContainer.appendChild(hint);
+  
+  let touchStartX = null, touchStartY = null;
+  let isSwiping = false;
+  let swipeDir = null; // 'left' or 'right'
+  const SWIPE_THRESHOLD = 40;
+  
+  pageCanvas.addEventListener('touchstart', (e) => {
+    // Don't intercept touches on markers, audio controls, or nav bar
+    if (e.target.closest('.marker')) return;
+    if (e.target.closest('.audio-section')) return;
+    if (e.target.closest('.page-nav')) return;
+    if (e.touches.length !== 1) return;
+    
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isSwiping = false;
+    swipeDir = null;
+  }, {passive: true});
+  
+  pageCanvas.addEventListener('touchmove', (e) => {
+    if (touchStartX === null) return;
+    
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    
+    // Only react to horizontal swipes (|dx| > |dy| AND |dx| > 15px)
+    if (Math.abs(dx) > 15 && Math.abs(dx) > Math.abs(dy)) {
+      isSwiping = true;
+      swipeDir = dx > 0 ? 'right' : 'left';
+      // Show direction hint
+      hint.textContent = dx > 0 ? '▶' : '◀';
+      hint.classList.add('show');
+      // Slightly fade image to indicate drag
+      const fadeAmount = Math.min(Math.abs(dx) / 200, 0.3);
+      imgContainer.style.opacity = (1 - fadeAmount).toString();
+    }
+  }, {passive: true});
+  
+  pageCanvas.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    
+    // Reset visual feedback
+    hint.classList.remove('show');
+    imgContainer.style.opacity = '';
+    
+    if (isSwiping && Math.abs(dx) > SWIPE_THRESHOLD) {
+      e.preventDefault();
+      // Fade out, then change page
+      imgContainer.classList.add('fade-out');
+      setTimeout(() => {
+        if (swipeDir === 'right') goPage(1);  // left→right = next page
+        else goPage(-1);                        // right→left = previous page
+      }, 100);
+    }
+    
+    touchStartX = null;
+    touchStartY = null;
+    isSwiping = false;
+    swipeDir = null;
+  }, {passive: false});
+  
+  pageCanvas.addEventListener('touchcancel', () => {
+    hint.classList.remove('show');
+    imgContainer.style.opacity = '';
+    touchStartX = null;
+    touchStartY = null;
+    isSwiping = false;
+    swipeDir = null;
+  }, {passive: true});
 }
 
 // ============================================================

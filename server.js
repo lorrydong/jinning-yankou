@@ -20,7 +20,60 @@ const MIME = {
 };
 
 const server = http.createServer((req, res) => {
-  let pathname = url.parse(req.url).pathname;
+  let pathname = decodeURIComponent(url.parse(req.url).pathname);
+  
+  // Handle load-annotation GET — return the most recent annotation file
+  if (pathname === '/load-annotation' && req.method === 'GET') {
+    const files = fs.readdirSync(ROOT).filter(f => f.startsWith('标注导出_') && f.endsWith('.json'));
+    if (files.length === 0) {
+      res.writeHead(404, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok: false, error: '服务器上没有找到标注记录' }));
+      return;
+    }
+    // Sort by name (which includes timestamp) to get the newest
+    files.sort().reverse();
+    const target = files[0];
+    try {
+      const content = fs.readFileSync(path.join(ROOT, target), 'utf-8');
+      res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(content);
+    } catch(e) {
+      res.writeHead(500, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+      res.end(JSON.stringify({ ok: false, error: '读取文件失败: ' + e.message }));
+    }
+    return;
+  }
+
+  // Handle list-annotations GET — list all annotation files on server
+  if (pathname === '/list-annotations' && req.method === 'GET') {
+    const files = fs.readdirSync(ROOT).filter(f => f.startsWith('标注导出_') && f.endsWith('.json'));
+    files.sort().reverse();
+    res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+    res.end(JSON.stringify({ ok: true, files }));
+    return;
+  }
+
+  // Handle save-annotation POST
+  if (pathname === '/save-annotation' && req.method === 'POST') {
+    let body = '';
+    req.on('data', chunk => body += chunk);
+    req.on('end', () => {
+      try {
+        const data = JSON.parse(body);
+        const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const filename = '标注导出_' + timestamp + '.json';
+        const filePath = path.join(ROOT, filename);
+        fs.writeFileSync(filePath, JSON.stringify(data, null, 2), 'utf-8');
+        res.writeHead(200, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: true, file: filename }));
+      } catch(e) {
+        res.writeHead(400, { 'Content-Type': 'application/json', 'Access-Control-Allow-Origin': '*' });
+        res.end(JSON.stringify({ ok: false, error: e.message }));
+      }
+    });
+    return;
+  }
+  
   if (pathname === '/') pathname = '/index.html';
   
   const filePath = path.join(ROOT, pathname);
@@ -57,7 +110,7 @@ const server = http.createServer((req, res) => {
         'Accept-Ranges': 'bytes',
         'Content-Length': chunkSize,
         'Content-Type': mime,
-        'Cache-Control': 'no-cache',
+        'Cache-Control': 'public, max-age=2592000, immutable',
         'Access-Control-Allow-Origin': '*',
       });
       
@@ -65,11 +118,19 @@ const server = http.createServer((req, res) => {
       stream.pipe(res);
       stream.on('error', () => res.end());
     } else {
+      // Aggressive caching for offline: images/audio = 30 days, HTML/JS = 1 day
+      let cacheMaxAge = 86400; // 1 day default
+      if (ext === '.mp3') cacheMaxAge = 2592000;  // 30 days for audio
+      else if (ext === '.jpg' || ext === '.jpeg' || ext === '.png' || ext === '.webp') cacheMaxAge = 2592000; // 30 days for images
+      else if (ext === '.html') cacheMaxAge = 86400; // 1 day for HTML
+      else if (ext === '.js') cacheMaxAge = 86400; // 1 day for JS
+      else if (ext === '.json') cacheMaxAge = 86400; // 1 day for JSON
+      
       res.writeHead(200, {
         'Content-Type': mime,
         'Content-Length': fileSize,
         'Accept-Ranges': 'bytes',
-        'Cache-Control': 'max-age=3600',
+        'Cache-Control': `public, max-age=${cacheMaxAge}, immutable`,
         'Access-Control-Allow-Origin': '*',
       });
       
